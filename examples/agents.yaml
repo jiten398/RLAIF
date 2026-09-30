@@ -1,0 +1,65 @@
+# Example judge panel for an indie dev fine-tuning a customer-support assistant.
+#
+# Decorrelation notes (see PanelConfig.decorrelation_report):
+#   - Two different providers are used (anthropic + a local openai_compatible
+#     endpoint) so the panel isn't just one model talking to itself in
+#     different voices.
+#   - Personas cover distinct, sometimes-competing concerns (helpfulness,
+#     safety, conciseness, adversarial nitpicking) rather than four versions
+#     of "is this a good response?".
+#   - Weights let the safety persona outvote the others without silencing
+#     them -- it multiplies confidence, it doesn't gate on its own.
+
+aggregation: weighted        # majority | weighted | debate
+agreement_threshold: 0.65    # drop pairs the panel didn't actually agree on
+human_audit_rate: 0.05       # export 5% of accepted pairs for a human to spot-check
+require_position_swap: true  # ask each agent twice (A/B swapped) to catch position bias
+
+agents:
+  - persona:
+      name: helpfulness
+      weight: 1.0
+      system_prompt: >
+        Judge which response better solves the user's actual problem: correct,
+        complete, and actionable. Ignore politeness/tone unless it actively
+        gets in the way of usefulness.
+    provider: anthropic
+    model: claude-haiku-4-5-20251001
+    api_key_env: ANTHROPIC_API_KEY
+
+  - persona:
+      name: safety
+      weight: 1.5
+      system_prompt: >
+        Judge which response better avoids unsafe, harmful, or policy-violating
+        content, and better declines or redirects when a request calls for it.
+        A response that is less helpful but appropriately cautious beats one
+        that is more helpful but unsafe.
+    provider: anthropic
+    model: claude-haiku-4-5-20251001
+    api_key_env: ANTHROPIC_API_KEY
+
+  - persona:
+      name: conciseness
+      weight: 0.8
+      system_prompt: >
+        Judge which response communicates the same substance with less
+        padding, hedging, and repetition. Penalize unnecessary length
+        explicitly -- a shorter response that says the same thing wins.
+    provider: openai_compatible
+    model: llama-3.1-8b-instruct     # e.g. served locally via vLLM/Ollama
+    base_url: http://localhost:8000/v1
+    api_key_env: LOCAL_LLM_API_KEY   # often unused/blank for local servers
+
+  - persona:
+      name: adversarial_nitpicker
+      weight: 1.0
+      system_prompt: >
+        Actively look for factual errors, unsupported claims, or subtly
+        wrong reasoning in both responses. If you find a real error in one
+        response that the other doesn't share, that response loses even if
+        it reads more confidently.
+    provider: openai_compatible
+    model: llama-3.1-8b-instruct
+    base_url: http://localhost:8000/v1
+    api_key_env: LOCAL_LLM_API_KEY

@@ -1,0 +1,44 @@
+# Network-free panel used by demo.py. The "model" field for provider=mock
+# doubles as the bias mode (see panelforge.model_adapters.MockAdapter):
+#   none | prefers_longer | sycophantic | random
+#
+# This panel is deliberately imperfect on purpose: one clean judge, one
+# length-biased judge, one sycophantic judge, and one pure-noise judge --
+# so that running `panelforge audit` or demo.py against it visibly triggers
+# the length-bias and low-position-consistency warnings in safety_checks.py.
+# That's the point: you should see this tool catch a bad panel, not just
+# take one at face value.
+
+aggregation: weighted
+agreement_threshold: 0.6
+human_audit_rate: 0.1
+require_position_swap: true
+
+agents:
+  - persona:
+      name: careful_reviewer
+      weight: 1.0
+      system_prompt: "Judge on correctness and usefulness only."
+    provider: mock
+    model: none
+
+  - persona:
+      name: safety_reviewer
+      weight: 1.2
+      system_prompt: "Judge on safety and appropriateness."
+    provider: mock
+    model: none
+
+  - persona:
+      name: verbosity_fan
+      weight: 1.0
+      system_prompt: "(Intentionally biased for demo purposes: prefers longer answers.)"
+    provider: mock
+    model: prefers_longer
+
+  - persona:
+      name: tone_pleaser
+      weight: 1.0
+      system_prompt: "(Intentionally biased for demo purposes: prefers confident/agreeable tone.)"
+    provider: mock
+    model: sycophantic
